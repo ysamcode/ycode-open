@@ -460,11 +460,10 @@ const RightSidebar = React.memo(function RightSidebar({
         return true;
 
       case 'typography':
-        // Typography controls: show in text edit mode or for text elements, buttons, icons, and form inputs
-        // In text edit mode, shows: font, size, weight, color, letter spacing, line height
-        // (text align is hidden by internal logic for inline styles)
+        // Typography controls: show in text edit mode or for text elements, buttons, icons, form inputs, and body
+        // Body typography cascades to all children (global font family, color, etc.)
         if (showTextStyleControls) return true;
-        return isTextLayer(layer) || isButtonLayer(layer) || isIconLayer(layer) || isFormInputLayer(layer);
+        return isTextLayer(layer) || isButtonLayer(layer) || isIconLayer(layer) || isFormInputLayer(layer) || layer.id === 'body';
 
       case 'backgrounds':
         // Background controls: show for all elements (text layers need it for clip-text effects)
