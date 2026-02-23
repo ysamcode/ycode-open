@@ -99,6 +99,31 @@ async function captureLayersAsBlob(
     // Wait for React to render + Tailwind to process all classes
     await new Promise((resolve) => setTimeout(resolve, TAILWIND_INIT_DELAY));
 
+    // Force eager loading — the offscreen iframe won't trigger lazy images
+    doc.querySelectorAll('img[loading="lazy"]').forEach((img) => {
+      img.setAttribute('loading', 'eager');
+      const src = img.getAttribute('src');
+      if (src) {
+        img.setAttribute('src', '');
+        img.setAttribute('src', src);
+      }
+    });
+
+    // Wait for images to load
+    const images = Array.from(doc.querySelectorAll('img'));
+    const pending = images.filter((img) => !img.complete);
+    if (pending.length > 0) {
+      await Promise.race([
+        Promise.all(pending.map((img) =>
+          new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true });
+            img.addEventListener('error', () => resolve(), { once: true });
+          })
+        )),
+        new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+      ]);
+    }
+
     // Capture the rendered content
     const target = doc.getElementById('component-preview');
     if (!target) throw new Error('Component preview element not found');
@@ -107,7 +132,12 @@ async function captureLayersAsBlob(
       backgroundColor: '#ffffff',
       pixelRatio: 1,
       skipFonts: false,
-      imagePlaceholder: DEFAULT_IMAGE_PLACEHOLDER, // Fallback for images that fail CORS fetch
+      imagePlaceholder: DEFAULT_IMAGE_PLACEHOLDER,
+      filter: (node: HTMLElement) => {
+        const tag = node.tagName;
+        if (tag === 'VIDEO' || tag === 'AUDIO' || tag === 'IFRAME') return false;
+        return true;
+      },
     });
 
     return blob;

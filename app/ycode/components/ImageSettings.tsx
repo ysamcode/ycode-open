@@ -76,7 +76,7 @@ interface CommonProps {
   fieldGroups?: FieldGroup[];
   allFields?: Record<string, CollectionField[]>;
   collections?: Collection[];
-  onOpenVariablesDialog?: () => void;
+  onOpenVariablesDialog?: (variableId?: string) => void;
 }
 
 type ImageSettingsProps = (LayerModeProps | StandaloneModeProps) & CommonProps;
@@ -349,7 +349,7 @@ export default function ImageSettings(props: ImageSettingsProps) {
     ? (standaloneValue?.height || '')
     : ((layer?.attributes?.height as string) || '');
   const lazyValue = isStandaloneMode
-    ? (standaloneValue?.loading === 'lazy')
+    ? (standaloneValue?.loading ?? 'lazy') === 'lazy'
     : (layer?.attributes?.loading === 'lazy');
 
   // Shared source picker content
@@ -393,7 +393,7 @@ export default function ImageSettings(props: ImageSettingsProps) {
                     </DropdownMenuSub>
                   )}
                   {onOpenVariablesDialog && (
-                    <DropdownMenuItem onClick={onOpenVariablesDialog}>
+                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
                       Manage variables
                     </DropdownMenuItem>
                   )}
@@ -411,13 +411,14 @@ export default function ImageSettings(props: ImageSettingsProps) {
               asChild
               variant="purple"
               className="justify-between! w-full"
-              onClick={handleUnlinkImageVariable}
+              onClick={() => onOpenVariablesDialog?.(linkedImageVariable.id)}
             >
               <div>
                 <span>{linkedImageVariable.name}</span>
                 <Button
                   className="size-4! p-0!"
                   variant="outline"
+                  onClick={(e) => { e.stopPropagation(); handleUnlinkImageVariable(); }}
                 >
                   <Icon name="x" className="size-2" />
                 </Button>

@@ -83,7 +83,7 @@ interface CommonProps {
   collections?: Collection[];
   isLockedByOther?: boolean;
   isInsideCollectionLayer?: boolean; // Whether fields come from a collection layer (vs page fields)
-  onOpenVariablesDialog?: () => void;
+  onOpenVariablesDialog?: (variableId?: string) => void;
   /** When true, standalone mode uses grid-cols-3 layout with labels on the left (like layer mode) */
   gridLayout?: boolean;
   /** Label for the link type selector row when using gridLayout in standalone mode */
@@ -743,7 +743,7 @@ export default function LinkSettings(props: LinkSettingsProps) {
                   </DropdownMenuSub>
                 )}
                 {onOpenVariablesDialog && (
-                  <DropdownMenuItem onClick={onOpenVariablesDialog}>
+                  <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
                     Manage variables
                   </DropdownMenuItem>
                 )}
@@ -763,13 +763,14 @@ export default function LinkSettings(props: LinkSettingsProps) {
             asChild
             variant="purple"
             className="justify-between! w-full"
-            onClick={handleUnlinkLinkVariable}
+            onClick={() => onOpenVariablesDialog?.(linkedLinkVariable.id)}
           >
             <div>
               <span>{linkedLinkVariable.name}</span>
               <Button
                 className="size-4! p-0!"
                 variant="outline"
+                onClick={(e) => { e.stopPropagation(); handleUnlinkLinkVariable(); }}
               >
                 <Icon name="x" className="size-2" />
               </Button>
@@ -1092,7 +1093,7 @@ export default function LinkSettings(props: LinkSettingsProps) {
   // Standalone mode: render without SettingsPanel wrapper
   if (isStandaloneMode) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col">
         {linkTypeContent}
         {typeSpecificContent}
         {anchorContent}

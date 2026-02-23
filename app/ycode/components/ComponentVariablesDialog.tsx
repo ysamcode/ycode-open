@@ -26,6 +26,9 @@ import {
 import RichTextEditor from './RichTextEditor';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
 import LinkSettings, { type LinkSettingsValue } from './LinkSettings';
+import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
+import VideoSettings, { type VideoSettingsValue } from './VideoSettings';
+import IconSettings, { type IconSettingsValue } from './IconSettings';
 
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
@@ -35,17 +38,22 @@ interface ComponentVariablesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   componentId: string | null;
+  initialVariableId?: string | null;
 }
 
 export default function ComponentVariablesDialog({
   open,
   onOpenChange,
   componentId,
+  initialVariableId,
 }: ComponentVariablesDialogProps) {
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const addTextVariable = useComponentsStore((state) => state.addTextVariable);
   const addImageVariable = useComponentsStore((state) => state.addImageVariable);
   const addLinkVariable = useComponentsStore((state) => state.addLinkVariable);
+  const addAudioVariable = useComponentsStore((state) => state.addAudioVariable);
+  const addVideoVariable = useComponentsStore((state) => state.addVideoVariable);
+  const addIconVariable = useComponentsStore((state) => state.addIconVariable);
   const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
   const deleteTextVariable = useComponentsStore((state) => state.deleteTextVariable);
   const fields = useCollectionsStore((state) => state.fields);
@@ -68,8 +76,15 @@ export default function ComponentVariablesDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      // Select first variable if exists, otherwise clear selection
-      if (textVariables.length > 0) {
+      const target = initialVariableId
+        ? textVariables.find((v) => v.id === initialVariableId)
+        : null;
+
+      if (target) {
+        setSelectedVariableId(target.id);
+        setEditingName(target.name);
+        setEditingDefaultValue(extractTiptapFromComponentVariable(target.default_value));
+      } else if (textVariables.length > 0) {
         setSelectedVariableId(textVariables[0].id);
         setEditingName(textVariables[0].name);
         setEditingDefaultValue(extractTiptapFromComponentVariable(textVariables[0].default_value));
@@ -124,6 +139,39 @@ export default function ComponentVariablesDialog({
     }
   };
 
+  // Handle creating a new audio variable
+  const handleAddAudioVariable = async () => {
+    if (!componentId) return;
+
+    const newId = await addAudioVariable(componentId, 'Audio');
+    if (newId) {
+      setSelectedVariableId(newId);
+      setEditingName('Audio');
+    }
+  };
+
+  // Handle creating a new video variable
+  const handleAddVideoVariable = async () => {
+    if (!componentId) return;
+
+    const newId = await addVideoVariable(componentId, 'Video');
+    if (newId) {
+      setSelectedVariableId(newId);
+      setEditingName('Video');
+    }
+  };
+
+  // Handle creating a new icon variable
+  const handleAddIconVariable = async () => {
+    if (!componentId) return;
+
+    const newId = await addIconVariable(componentId, 'Icon');
+    if (newId) {
+      setSelectedVariableId(newId);
+      setEditingName('Icon');
+    }
+  };
+
   // Handle image default value change (via ImageSettings standalone mode)
   const handleImageDefaultValueChange = (value: ImageSettingsValue) => {
     if (!componentId || !selectedVariableId) return;
@@ -132,6 +180,21 @@ export default function ComponentVariablesDialog({
 
   // Handle link default value change (via LinkSettings standalone mode)
   const handleLinkDefaultValueChange = (value: LinkSettingsValue) => {
+    if (!componentId || !selectedVariableId) return;
+    updateTextVariable(componentId, selectedVariableId, { default_value: value });
+  };
+
+  const handleAudioDefaultValueChange = (value: AudioSettingsValue) => {
+    if (!componentId || !selectedVariableId) return;
+    updateTextVariable(componentId, selectedVariableId, { default_value: value });
+  };
+
+  const handleVideoDefaultValueChange = (value: VideoSettingsValue) => {
+    if (!componentId || !selectedVariableId) return;
+    updateTextVariable(componentId, selectedVariableId, { default_value: value });
+  };
+
+  const handleIconDefaultValueChange = (value: IconSettingsValue) => {
     if (!componentId || !selectedVariableId) return;
     updateTextVariable(componentId, selectedVariableId, { default_value: value });
   };
@@ -190,11 +253,11 @@ export default function ComponentVariablesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0" aria-describedby={undefined}>
+      <DialogContent className="gap-0 pb-0" aria-describedby={undefined}>
         <DialogTitle className="sr-only">Component Variables</DialogTitle>
-        <div className="flex -mx-6 -mt-6">
+        <div className="flex -mx-6 -mt-6 h-120">
           {/* Left sidebar - variable list */}
-          <div className="w-52 border-r border-border max-h-full noscrollbar overflow-y-auto h-120 px-5 flex flex-col">
+          <div className="w-60 border-r border-border noscrollbar overflow-y-auto px-5 flex flex-col">
             <header className="py-5 flex justify-between shrink-0">
               <span className="font-medium">Component variables</span>
               <div className="-my-1">
@@ -209,13 +272,25 @@ export default function ComponentVariablesDialog({
                       <Icon name="text" className="size-3" />
                       Text
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddLinkVariable}>
+                      <Icon name="link" className="size-3" />
+                      Link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddIconVariable}>
+                      <Icon name="icon" className="size-3" />
+                      Icon
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleAddImageVariable}>
                       <Icon name="image" className="size-3" />
                       Image
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleAddLinkVariable}>
-                      <Icon name="link" className="size-3" />
-                      Link
+                    <DropdownMenuItem onClick={handleAddAudioVariable}>
+                      <Icon name="audio" className="size-3" />
+                      Audio
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddVideoVariable}>
+                      <Icon name="video" className="size-3" />
+                      Video
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -228,11 +303,20 @@ export default function ComponentVariablesDialog({
                 <Button
                   key={variable.id}
                   variant={selectedVariableId === variable.id ? 'secondary' : 'ghost'}
-                  className="justify-start"
+                  className="justify-start group"
                   onClick={() => setSelectedVariableId(variable.id)}
                 >
-                  <Icon name={variable.type === 'image' ? 'image' : variable.type === 'link' ? 'link' : 'text'} className="size-3" />
-                  {variable.name}
+                  <Icon name={variable.type === 'image' ? 'image' : variable.type === 'link' ? 'link' : variable.type === 'audio' ? 'audio' : variable.type === 'video' ? 'video' : variable.type === 'icon' ? 'icon' : 'text'} className="size-3 shrink-0" />
+                  <span className="truncate flex-1 text-left">{variable.name}</span>
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    className={`ml-auto text-muted-foreground/50 hover:text-muted-foreground ${selectedVariableId === variable.id ? '' : 'opacity-0 group-hover:opacity-100'}`}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteVariable(variable.id); }}
+                    aria-label={`Delete ${variable.name}`}
+                  >
+                    <Icon name="x" className="size-3.5" />
+                  </span>
                 </Button>
               ))}
 
@@ -245,7 +329,7 @@ export default function ComponentVariablesDialog({
           </div>
 
           {/* Right panel - variable editor */}
-          <div className="flex-1 p-6 pt-14 flex flex-col gap-2">
+          <div className="flex-1 p-6 pt-14 flex flex-col gap-3">
             {selectedVariable ? (
               <>
                 <div className="grid grid-cols-3">
@@ -261,11 +345,10 @@ export default function ComponentVariablesDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3">
-                  <Label variant="muted">Default</Label>
+                <div className="grid grid-cols-3 items-start">
+                  <Label variant="muted" className="pt-2">Default</Label>
                   <div className="col-span-2 *:w-full">
                     {selectedVariable.type === 'link' ? (
-                      // Link variable - use LinkSettings in standalone mode
                       <LinkSettings
                         mode="standalone"
                         value={selectedVariable.default_value as LinkSettingsValue}
@@ -274,7 +357,6 @@ export default function ComponentVariablesDialog({
                         collections={collections}
                       />
                     ) : selectedVariable.type === 'image' ? (
-                      // Image variable - use ImageSettings in standalone mode
                       <ImageSettings
                         mode="standalone"
                         value={selectedVariable.default_value as ImageSettingsValue}
@@ -282,8 +364,29 @@ export default function ComponentVariablesDialog({
                         allFields={fields}
                         collections={collections}
                       />
+                    ) : selectedVariable.type === 'audio' ? (
+                      <AudioSettings
+                        mode="standalone"
+                        value={selectedVariable.default_value as AudioSettingsValue}
+                        onChange={handleAudioDefaultValueChange}
+                        allFields={fields}
+                        collections={collections}
+                      />
+                    ) : selectedVariable.type === 'video' ? (
+                      <VideoSettings
+                        mode="standalone"
+                        value={selectedVariable.default_value as VideoSettingsValue}
+                        onChange={handleVideoDefaultValueChange}
+                        allFields={fields}
+                        collections={collections}
+                      />
+                    ) : selectedVariable.type === 'icon' ? (
+                      <IconSettings
+                        mode="standalone"
+                        value={selectedVariable.default_value as IconSettingsValue}
+                        onChange={handleIconDefaultValueChange}
+                      />
                     ) : (
-                      // Text variable - use RichTextEditor
                       <RichTextEditor
                         value={editingDefaultValue}
                         onChange={handleDefaultValueChange}
@@ -298,17 +401,6 @@ export default function ComponentVariablesDialog({
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteVariable(selectedVariable.id)}
-                  >
-                    <Icon name="trash" />
-                    Delete variable
-                  </Button>
-                </div>
               </>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">

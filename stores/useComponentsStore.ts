@@ -33,7 +33,9 @@ export function triggerThumbnailGeneration(
         const state = useComponentsStore.getState();
         state.setComponents(
           state.components.map((c) =>
-            c.id === componentId ? { ...c, thumbnail_url: thumbnailUrl } : c
+            c.id === componentId
+              ? { ...c, thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() }
+              : c
           )
         );
       }
@@ -105,6 +107,9 @@ interface ComponentsActions {
   addTextVariable: (componentId: string, name: string) => Promise<string | null>;
   addImageVariable: (componentId: string, name: string) => Promise<string | null>;
   addLinkVariable: (componentId: string, name: string) => Promise<string | null>;
+  addAudioVariable: (componentId: string, name: string) => Promise<string | null>;
+  addVideoVariable: (componentId: string, name: string) => Promise<string | null>;
+  addIconVariable: (componentId: string, name: string) => Promise<string | null>;
   updateTextVariable: (componentId: string, variableId: string, updates: { name?: string; default_value?: any }) => Promise<void>;
   deleteTextVariable: (componentId: string, variableId: string) => Promise<void>;
 
@@ -765,6 +770,108 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
         return variableId;
       } catch (error) {
         console.error('Failed to add link variable:', error);
+        return null;
+      }
+    },
+
+    addAudioVariable: async (componentId, name) => {
+      const component = get().getComponentById(componentId);
+      if (!component) return null;
+
+      const variableId = generateId('cpv');
+      const newVariable = { id: variableId, name, type: 'audio' as const };
+      const updatedVariables = [...(component.variables || []), newVariable];
+
+      try {
+        const response = await fetch(`/ycode/api/components/${componentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variables: updatedVariables }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          console.error('Failed to add audio variable:', result.error);
+          return null;
+        }
+
+        set((state) => ({
+          components: state.components.map((c) =>
+            c.id === componentId ? { ...c, variables: updatedVariables } : c
+          ),
+        }));
+
+        return variableId;
+      } catch (error) {
+        console.error('Failed to add audio variable:', error);
+        return null;
+      }
+    },
+
+    addVideoVariable: async (componentId, name) => {
+      const component = get().getComponentById(componentId);
+      if (!component) return null;
+
+      const variableId = generateId('cpv');
+      const newVariable = { id: variableId, name, type: 'video' as const };
+      const updatedVariables = [...(component.variables || []), newVariable];
+
+      try {
+        const response = await fetch(`/ycode/api/components/${componentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variables: updatedVariables }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          console.error('Failed to add video variable:', result.error);
+          return null;
+        }
+
+        set((state) => ({
+          components: state.components.map((c) =>
+            c.id === componentId ? { ...c, variables: updatedVariables } : c
+          ),
+        }));
+
+        return variableId;
+      } catch (error) {
+        console.error('Failed to add video variable:', error);
+        return null;
+      }
+    },
+
+    addIconVariable: async (componentId, name) => {
+      const component = get().getComponentById(componentId);
+      if (!component) return null;
+
+      const variableId = generateId('cpv');
+      const newVariable = { id: variableId, name, type: 'icon' as const };
+      const updatedVariables = [...(component.variables || []), newVariable];
+
+      try {
+        const response = await fetch(`/ycode/api/components/${componentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variables: updatedVariables }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          console.error('Failed to add icon variable:', result.error);
+          return null;
+        }
+
+        set((state) => ({
+          components: state.components.map((c) =>
+            c.id === componentId ? { ...c, variables: updatedVariables } : c
+          ),
+        }));
+
+        return variableId;
+      } catch (error) {
+        console.error('Failed to add icon variable:', error);
         return null;
       }
     },

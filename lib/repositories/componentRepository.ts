@@ -124,6 +124,7 @@ export async function createComponent(
   const contentHash = generateComponentContentHash({
     name: componentData.name,
     layers: componentData.layers,
+    variables: componentData.variables,
   });
 
   const insertData: any = {
@@ -197,6 +198,7 @@ export async function updateComponent(
   const finalData = {
     name: updates.name !== undefined ? updates.name : current.name,
     layers: updates.layers !== undefined ? updates.layers : current.layers,
+    variables: updates.variables !== undefined ? updates.variables : current.variables,
   };
 
   // Recalculate content hash
@@ -272,6 +274,7 @@ export async function publishComponent(draftComponentId: string): Promise<Compon
       id: draftComponent.id, // Same ID for draft and published versions
       name: draftComponent.name,
       layers: draftComponent.layers,
+      variables: draftComponent.variables,
       content_hash: draftComponent.content_hash, // Copy hash from draft
       is_published: true,
       updated_at: new Date().toISOString(),
@@ -323,6 +326,7 @@ export async function publishComponents(componentIds: string[]): Promise<{ count
     id: draft.id,
     name: draft.name,
     layers: draft.layers,
+    variables: draft.variables,
     content_hash: draft.content_hash,
     is_published: true,
     updated_at: new Date().toISOString(),

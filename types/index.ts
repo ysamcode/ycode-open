@@ -293,6 +293,9 @@ export interface Layer {
     text?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (text)
     image?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (image)
     link?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (link)
+    audio?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (audio)
+    video?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (video)
+    icon?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (icon)
   };
 
   // Layer variables (layer collection data & dynamic data for texts, assets, links)
@@ -463,7 +466,7 @@ export interface BlockTemplate {
 export interface ComponentVariable {
   id: string;        // Unique variable ID
   name: string;      // Display name (e.g., "Button title")
-  type?: 'text' | 'image' | 'link'; // Variable type (defaults to 'text' for backwards compatibility)
+  type?: 'text' | 'image' | 'link' | 'audio' | 'video' | 'icon'; // Variable type (defaults to 'text' for backwards compatibility)
   default_value?: ComponentVariableValue; // Default value
 }
 
@@ -1031,8 +1034,33 @@ export interface ImageSettingsValue {
 // Link settings value for component variables (alias to LinkSettings)
 export type LinkSettingsValue = LinkSettings;
 
-// Component variable value type (text, image, and link variables)
-export type ComponentVariableValue = DynamicTextVariable | DynamicRichTextVariable | ImageSettingsValue | LinkSettingsValue;
+// Audio settings value for component variables
+export interface AudioSettingsValue {
+  src?: AssetVariable | DynamicTextVariable | FieldVariable;
+  controls?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  volume?: number;
+}
+
+// Video settings value for component variables
+export interface VideoSettingsValue {
+  src?: AssetVariable | VideoVariable | FieldVariable | DynamicTextVariable;
+  poster?: AssetVariable | FieldVariable;
+  controls?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  autoplay?: boolean;
+  youtubePrivacyMode?: boolean;
+}
+
+// Icon settings value for component variables
+export interface IconSettingsValue {
+  src?: AssetVariable | StaticTextVariable;
+}
+
+// Component variable value type (text, image, link, audio, video, and icon variables)
+export type ComponentVariableValue = DynamicTextVariable | DynamicRichTextVariable | ImageSettingsValue | LinkSettingsValue | AudioSettingsValue | VideoSettingsValue | IconSettingsValue;
 
 // Pagination Layer Definition (partial Layer for styling pagination controls)
 export interface PaginationLayerConfig {

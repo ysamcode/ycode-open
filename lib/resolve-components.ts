@@ -64,8 +64,7 @@ function transformLayerIdsForInstance(layers: Layer[], instanceLayerId: string):
 
 /**
  * Apply component variable overrides (or defaults) to layers
- * Recursively finds layers with variables.text.id, variables.image.src.id, or variables.link.variable_id
- * and applies override or default values
+ * Recursively finds layers with linked variables and applies override or default values
  */
 function applyComponentOverrides(
   layers: Layer[],
@@ -144,6 +143,89 @@ function applyComponentOverrides(
           variables: {
             ...updatedLayer.variables,
             link: { ...linkValue, variable_id: linkedLinkVariableId },
+          },
+        };
+      }
+    }
+
+    // Check if this layer has an audio variable linked
+    const linkedAudioVariableId = (layer.variables?.audio?.src as any)?.id;
+    if (linkedAudioVariableId) {
+      const overrideValue = overrides?.audio?.[linkedAudioVariableId];
+      const variableDef = componentVariables?.find(v => v.id === linkedAudioVariableId);
+      const audioValue = (overrideValue ?? variableDef?.default_value) as any;
+
+      if (audioValue) {
+        const audioAttributes: Record<string, unknown> = {};
+        if (audioValue.controls !== undefined) audioAttributes.controls = audioValue.controls;
+        if (audioValue.loop !== undefined) audioAttributes.loop = audioValue.loop;
+        if (audioValue.muted !== undefined) audioAttributes.muted = audioValue.muted;
+        if (audioValue.volume !== undefined) audioAttributes.volume = String(audioValue.volume);
+
+        updatedLayer = {
+          ...updatedLayer,
+          variables: {
+            ...updatedLayer.variables,
+            audio: {
+              ...updatedLayer.variables?.audio,
+              src: audioValue.src ? { ...audioValue.src, id: linkedAudioVariableId } : updatedLayer.variables?.audio?.src,
+            },
+          },
+          ...(Object.keys(audioAttributes).length > 0 && {
+            attributes: { ...updatedLayer.attributes, ...audioAttributes },
+          }),
+        };
+      }
+    }
+
+    // Check if this layer has a video variable linked
+    const linkedVideoVariableId = (layer.variables?.video?.src as any)?.id;
+    if (linkedVideoVariableId) {
+      const overrideValue = overrides?.video?.[linkedVideoVariableId];
+      const variableDef = componentVariables?.find(v => v.id === linkedVideoVariableId);
+      const videoValue = (overrideValue ?? variableDef?.default_value) as any;
+
+      if (videoValue) {
+        const videoAttributes: Record<string, unknown> = {};
+        if (videoValue.controls !== undefined) videoAttributes.controls = videoValue.controls;
+        if (videoValue.loop !== undefined) videoAttributes.loop = videoValue.loop;
+        if (videoValue.muted !== undefined) videoAttributes.muted = videoValue.muted;
+        if (videoValue.autoplay !== undefined) videoAttributes.autoplay = videoValue.autoplay;
+        if (videoValue.youtubePrivacyMode !== undefined) videoAttributes.youtubePrivacyMode = videoValue.youtubePrivacyMode;
+
+        updatedLayer = {
+          ...updatedLayer,
+          variables: {
+            ...updatedLayer.variables,
+            video: {
+              ...updatedLayer.variables?.video,
+              src: videoValue.src ? { ...videoValue.src, id: linkedVideoVariableId } : updatedLayer.variables?.video?.src,
+              poster: videoValue.poster ?? updatedLayer.variables?.video?.poster,
+            },
+          },
+          ...(Object.keys(videoAttributes).length > 0 && {
+            attributes: { ...updatedLayer.attributes, ...videoAttributes },
+          }),
+        };
+      }
+    }
+
+    // Check if this layer has an icon variable linked
+    const linkedIconVariableId = (layer.variables?.icon?.src as any)?.id;
+    if (linkedIconVariableId) {
+      const overrideValue = overrides?.icon?.[linkedIconVariableId];
+      const variableDef = componentVariables?.find(v => v.id === linkedIconVariableId);
+      const iconValue = (overrideValue ?? variableDef?.default_value) as any;
+
+      if (iconValue) {
+        updatedLayer = {
+          ...updatedLayer,
+          variables: {
+            ...updatedLayer.variables,
+            icon: {
+              ...updatedLayer.variables?.icon,
+              src: iconValue.src ? { ...iconValue.src, id: linkedIconVariableId } : updatedLayer.variables?.icon?.src,
+            },
           },
         };
       }

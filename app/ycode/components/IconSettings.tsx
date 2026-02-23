@@ -10,67 +10,111 @@ import React, { useState, useCallback, useMemo } from 'react';
 
 import { Label } from '@/components/ui/label';
 import SettingsPanel from './SettingsPanel';
-import type { Layer } from '@/types';
+import type { Layer, IconSettingsValue } from '@/types';
 import { createAssetVariable, isAssetVariable, getAssetId, isStaticTextVariable, getStaticTextContent } from '@/lib/variable-utils';
 import { DEFAULT_ASSETS, isAssetOfType, ASSET_CATEGORIES } from '@/lib/asset-utils';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
+import { useComponentsStore } from '@/stores/useComponentsStore';
 import { toast } from 'sonner';
 import Icon from '@/components/ui/icon';
 
-interface IconSettingsProps {
+// Re-export IconSettingsValue from types for convenience
+export type { IconSettingsValue } from '@/types';
+
+// Layer mode props - for editing icon layers
+interface LayerModeProps {
+  mode?: 'layer';
   layer: Layer | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
+  value?: never;
+  onChange?: never;
 }
 
-export default function IconSettings({ layer, onLayerUpdate }: IconSettingsProps) {
+// Standalone mode props - for component variable overrides
+interface StandaloneModeProps {
+  mode: 'standalone';
+  value: IconSettingsValue | undefined;
+  onChange: (value: IconSettingsValue) => void;
+  layer?: never;
+  onLayerUpdate?: never;
+}
+
+interface CommonProps {
+  onOpenVariablesDialog?: (variableId?: string) => void;
+}
+
+type IconSettingsProps = (LayerModeProps | StandaloneModeProps) & CommonProps;
+
+export default function IconSettings(props: IconSettingsProps) {
+  const { onOpenVariablesDialog } = props;
+  const isStandaloneMode = props.mode === 'standalone';
+
+  // Layer mode props
+  const layer = isStandaloneMode ? null : props.layer;
+  const onLayerUpdate = isStandaloneMode ? undefined : props.onLayerUpdate;
+
+  // Standalone mode props
+  const standaloneValue = isStandaloneMode ? props.value : undefined;
+  const standaloneOnChange = isStandaloneMode ? props.onChange : undefined;
   const [isOpen, setIsOpen] = useState(true);
 
-  // Get icon source variable
-  const iconSrc = layer?.variables?.icon?.src;
-
   const openFileManager = useEditorStore((state) => state.openFileManager);
+  const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const getAsset = useAssetsStore((state) => state.getAsset);
+  const getComponentById = useComponentsStore((state) => state.getComponentById);
+
+  // Get component variables for icon linking (when editing a component in layer mode)
+  const editingComponent = !isStandaloneMode && editingComponentId ? getComponentById(editingComponentId) : undefined;
+  const componentVariables = editingComponent?.variables || [];
+  const iconComponentVariables = componentVariables.filter(v => v.type === 'icon');
+
+  // Get icon source variable - from layer or standalone value
+  const iconSrc = isStandaloneMode ? standaloneValue?.src : layer?.variables?.icon?.src;
+
+  // Get linked icon variable ID from layer (stored in src.id)
+  const linkedIconVariableId = !isStandaloneMode && iconSrc ? (iconSrc as any).id : undefined;
+  const linkedIconVariable = iconComponentVariables.find(v => v.id === linkedIconVariableId);
 
   // Icons only support AssetVariable in the UI (StaticTextVariable is for internal use only)
   // If we have a StaticTextVariable, treat it as if no source is set (user can't edit it)
 
   const handleAssetSelect = useCallback((assetId: string) => {
-    if (!layer) return;
-
     const assetVariable = createAssetVariable(assetId);
 
+    if (isStandaloneMode && standaloneOnChange) {
+      standaloneOnChange({ src: assetVariable });
+      return;
+    }
+
+    if (!layer || !onLayerUpdate) return;
     onLayerUpdate(layer.id, {
       variables: {
         ...layer.variables,
-        icon: {
-          src: assetVariable,
-        },
+        icon: { src: assetVariable },
       },
     });
-  }, [layer, onLayerUpdate]);
+  }, [isStandaloneMode, standaloneOnChange, layer, onLayerUpdate]);
 
   const handleBrowseAsset = useCallback(() => {
-    // Get current asset ID if icon src is an AssetVariable
     const currentAssetId = (() => {
-      const src = layer?.variables?.icon?.src;
-      if (isAssetVariable(src)) {
-        return getAssetId(src);
+      if (isAssetVariable(iconSrc)) {
+        return getAssetId(iconSrc);
       }
       return null;
     })();
 
     openFileManager(
       (asset) => {
-        if (!layer) return false;
+        if (!isStandaloneMode && !layer) return false;
 
-        // Validate that it's an SVG file (icon)
         if (!asset.mime_type || !isAssetOfType(asset.mime_type, ASSET_CATEGORIES.ICONS)) {
           toast.error('Invalid asset type', {
             description: 'Please select an SVG file.',
           });
-          return false; // Don't close file manager
+          return false;
         }
 
         handleAssetSelect(asset.id);
@@ -78,10 +122,48 @@ export default function IconSettings({ layer, onLayerUpdate }: IconSettingsProps
       currentAssetId,
       ASSET_CATEGORIES.ICONS
     );
-  }, [openFileManager, handleAssetSelect, layer]);
+  }, [openFileManager, handleAssetSelect, isStandaloneMode, layer, iconSrc]);
 
-  // Only show for icon layers
-  if (!layer || layer.name !== 'icon') {
+  const handleLinkIconVariable = useCallback((variableId: string) => {
+    if (!layer || !onLayerUpdate) return;
+
+    const currentSrc = layer.variables?.icon?.src;
+
+    onLayerUpdate(layer.id, {
+      variables: {
+        ...layer.variables,
+        icon: {
+          ...layer.variables?.icon,
+          src: currentSrc
+            ? { ...currentSrc, id: variableId } as any
+            : { type: 'asset', id: variableId, data: { asset_id: null } } as any,
+        },
+      },
+    });
+  }, [layer, onLayerUpdate]);
+
+  const handleUnlinkIconVariable = useCallback(() => {
+    if (!layer || !onLayerUpdate) return;
+
+    const currentSrc = layer.variables?.icon?.src;
+
+    if (currentSrc) {
+      const { id: _, ...srcWithoutId } = currentSrc as any;
+
+      onLayerUpdate(layer.id, {
+        variables: {
+          ...layer.variables,
+          icon: {
+            ...layer.variables?.icon,
+            src: srcWithoutId,
+          },
+        },
+      });
+    }
+  }, [layer, onLayerUpdate]);
+
+  // In layer mode, only show for icon layers
+  if (!isStandaloneMode && (!layer || layer.name !== 'icon')) {
     return null;
   }
 
@@ -99,21 +181,50 @@ export default function IconSettings({ layer, onLayerUpdate }: IconSettingsProps
       }
     }
 
-    // Return default icon if no valid content
     return iconContent && iconContent.trim() !== '' ? iconContent : DEFAULT_ASSETS.ICON;
   })();
 
   // Get current asset ID and asset for display
   const currentAssetId = (() => {
-    const src = layer?.variables?.icon?.src;
-    if (isAssetVariable(src)) {
-      return getAssetId(src);
+    if (isAssetVariable(iconSrc)) {
+      return getAssetId(iconSrc);
     }
     return null;
   })();
 
   const currentAsset = currentAssetId ? getAsset(currentAssetId) : null;
   const assetFilename = currentAsset?.filename || null;
+
+  // Icon file picker content (shared between modes)
+  const iconPickerContent = (
+    <div
+      className="relative group bg-secondary/30 hover:bg-secondary/60 rounded-md w-full aspect-3/2 overflow-hidden cursor-pointer"
+      onClick={handleBrowseAsset}
+    >
+      <div className="absolute inset-0 opacity-10 bg-checkerboard" />
+      <div className="relative w-full h-full flex items-center justify-center p-4 z-10">
+        {currentIconSource ? (
+          <div
+            data-icon="true"
+            className="w-full h-full flex items-center justify-center"
+            dangerouslySetInnerHTML={{ __html: currentIconSource }}
+          />
+        ) : (
+          <Icon name="icon" className="size-4 text-muted-foreground" />
+        )}
+      </div>
+
+      <div className="absolute inset-0 bg-black/50 text-white text-xs flex flex-col gap-3 items-center justify-center px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        <Button variant="overlay" size="sm">{assetFilename ? 'Change file' : 'Choose file'}</Button>
+        {assetFilename && <div className="max-w-full truncate text-center">{assetFilename}</div>}
+      </div>
+    </div>
+  );
+
+  // Standalone mode - just icon picker
+  if (isStandaloneMode) {
+    return iconPickerContent;
+  }
 
   return (
     <SettingsPanel
@@ -122,34 +233,74 @@ export default function IconSettings({ layer, onLayerUpdate }: IconSettingsProps
       onToggle={() => setIsOpen(!isOpen)}
     >
       <div className="flex flex-col gap-3">
-        {/* File Manager Upload */}
         <div className="grid grid-cols-3 items-start">
-          <Label variant="muted" className="pt-2">File</Label>
-
+          <div className="flex items-start gap-1 py-1">
+            {editingComponentId ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="variable"
+                    size="xs"
+                    className="has-[>svg]:px-0"
+                  >
+                    <Icon name="plus-circle-solid" />
+                    File
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {iconComponentVariables.length > 0 && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {iconComponentVariables.map((variable) => (
+                            <DropdownMenuItem
+                              key={variable.id}
+                              onClick={() => handleLinkIconVariable(variable.id)}
+                            >
+                              {variable.name}
+                              {linkedIconVariableId === variable.id && (
+                                <Icon name="check" className="ml-auto size-3" />
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  )}
+                  {onOpenVariablesDialog && (
+                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
+                      Manage variables
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Label variant="muted" className="pt-1">File</Label>
+            )}
+          </div>
           <div className="col-span-2">
-            <div
-              className="relative group bg-secondary/30 hover:bg-secondary/60 rounded-md w-full aspect-3/2 overflow-hidden cursor-pointer"
-              onClick={handleBrowseAsset}
-            >
-              {/* Checkerboard pattern for transparency */}
-              <div className="absolute inset-0 opacity-10 bg-checkerboard" />
-              <div className="relative w-full h-full flex items-center justify-center p-4 z-10">
-                {currentIconSource ? (
-                  <div
-                    data-icon="true"
-                    className="w-full h-full flex items-center justify-center"
-                    dangerouslySetInnerHTML={{ __html: currentIconSource }}
-                  />
-                ) : (
-                  <Icon name="icon" className="size-4 text-muted-foreground" />
-                )}
-              </div>
-
-              <div className="absolute inset-0 bg-black/50 text-white text-xs flex flex-col gap-3 items-center justify-center px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                <Button variant="overlay" size="sm">{assetFilename ? 'Change file' : 'Choose file'}</Button>
-                {assetFilename && <div className="max-w-full truncate text-center">{assetFilename}</div>}
-              </div>
-            </div>
+            {linkedIconVariable ? (
+              <Button
+                asChild
+                variant="purple"
+                className="justify-between! w-full"
+                onClick={() => onOpenVariablesDialog?.(linkedIconVariable.id)}
+              >
+                <div>
+                  <span>{linkedIconVariable.name}</span>
+                  <Button
+                    className="size-4! p-0!"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); handleUnlinkIconVariable(); }}
+                  >
+                    <Icon name="x" className="size-2" />
+                  </Button>
+                </div>
+              </Button>
+            ) : (
+              iconPickerContent
+            )}
           </div>
         </div>
       </div>

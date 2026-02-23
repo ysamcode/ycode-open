@@ -163,6 +163,7 @@ export function generatePageContentHash(
 export function generateComponentContentHash(componentData: {
   name: string;
   layers: any;
+  variables?: any;
 }): string {
   // Strip UI properties from layers before hashing
   const layersForHash = Array.isArray(componentData.layers)
@@ -172,6 +173,7 @@ export function generateComponentContentHash(componentData: {
   return generateContentHash({
     name: componentData.name,
     layers: layersForHash,
+    variables: componentData.variables,
   });
 }
 

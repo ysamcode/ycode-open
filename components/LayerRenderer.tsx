@@ -709,6 +709,92 @@ const LayerItem: React.FC<{
   ) || 'Image';
   const imageAlt = translatedImageAlt;
 
+  // Resolve audio source - check for linked component variable first
+  const linkedAudioVariableId = (layer.variables?.audio?.src as any)?.id;
+  const effectiveAudioSettings = (() => {
+    if (linkedAudioVariableId && componentVariables) {
+      const overrideValue = parentComponentOverrides?.audio?.[linkedAudioVariableId];
+      const variableDef = componentVariables.find(v => v.id === linkedAudioVariableId);
+      const valueToUse = (overrideValue ?? variableDef?.default_value) as any;
+      if (valueToUse) {
+        return {
+          src: valueToUse.src || layer.variables?.audio?.src,
+          attributes: {
+            ...(valueToUse.controls !== undefined && { controls: valueToUse.controls }),
+            ...(valueToUse.loop !== undefined && { loop: valueToUse.loop }),
+            ...(valueToUse.muted !== undefined && { muted: valueToUse.muted }),
+            ...(valueToUse.volume !== undefined && { volume: String(valueToUse.volume) }),
+          },
+        };
+      }
+    }
+    return null;
+  })();
+
+  // Resolve video source - check for linked component variable first
+  const linkedVideoVariableId = (layer.variables?.video?.src as any)?.id;
+  const effectiveVideoSettings = (() => {
+    if (linkedVideoVariableId && componentVariables) {
+      const overrideValue = parentComponentOverrides?.video?.[linkedVideoVariableId];
+      const variableDef = componentVariables.find(v => v.id === linkedVideoVariableId);
+      const valueToUse = (overrideValue ?? variableDef?.default_value) as any;
+      if (valueToUse) {
+        return {
+          src: valueToUse.src || layer.variables?.video?.src,
+          poster: valueToUse.poster ?? layer.variables?.video?.poster,
+          attributes: {
+            ...(valueToUse.controls !== undefined && { controls: valueToUse.controls }),
+            ...(valueToUse.loop !== undefined && { loop: valueToUse.loop }),
+            ...(valueToUse.muted !== undefined && { muted: valueToUse.muted }),
+            ...(valueToUse.autoplay !== undefined && { autoplay: valueToUse.autoplay }),
+            ...(valueToUse.youtubePrivacyMode !== undefined && { youtubePrivacyMode: valueToUse.youtubePrivacyMode }),
+          },
+        };
+      }
+    }
+    return null;
+  })();
+
+  // Resolve icon source - check for linked component variable first
+  const linkedIconVariableId = (layer.variables?.icon?.src as any)?.id;
+  const effectiveIconSrc = (() => {
+    if (linkedIconVariableId && componentVariables) {
+      const overrideValue = parentComponentOverrides?.icon?.[linkedIconVariableId];
+      const variableDef = componentVariables.find(v => v.id === linkedIconVariableId);
+      const valueToUse = (overrideValue ?? variableDef?.default_value) as any;
+      if (valueToUse?.src) {
+        return valueToUse.src;
+      }
+    }
+    return layer.variables?.icon?.src;
+  })();
+
+  // Build effective layer with resolved component variable overrides
+  const effectiveLayer = useMemo(() => {
+    let resolved = layer;
+    if (effectiveAudioSettings) {
+      resolved = {
+        ...resolved,
+        variables: { ...resolved.variables, audio: { ...resolved.variables?.audio, src: effectiveAudioSettings.src } },
+        attributes: { ...resolved.attributes, ...effectiveAudioSettings.attributes },
+      };
+    }
+    if (effectiveVideoSettings) {
+      resolved = {
+        ...resolved,
+        variables: { ...resolved.variables, video: { ...resolved.variables?.video, src: effectiveVideoSettings.src, poster: effectiveVideoSettings.poster } },
+        attributes: { ...resolved.attributes, ...effectiveVideoSettings.attributes },
+      };
+    }
+    if (effectiveIconSrc && effectiveIconSrc !== layer.variables?.icon?.src) {
+      resolved = {
+        ...resolved,
+        variables: { ...resolved.variables, icon: { ...resolved.variables?.icon, src: effectiveIconSrc } },
+      };
+    }
+    return resolved;
+  }, [layer, effectiveAudioSettings, effectiveVideoSettings, effectiveIconSrc]);
+
   // Handle component instances - only fetch from store in edit mode
   // In published pages, components are pre-resolved server-side via resolveComponents()
   const getComponentById = useComponentsStore((state) => state.getComponentById);
@@ -1053,7 +1139,7 @@ const LayerItem: React.FC<{
     }
 
     const Tag = htmlTag as any;
-    const { style: attrStyle, ...otherAttributes } = layer.attributes || {};
+    const { style: attrStyle, ...otherAttributes } = effectiveLayer.attributes || {};
 
     // Map HTML attributes to React JSX equivalents
     const htmlToJsxAttrMap: Record<string, string> = {
@@ -1501,7 +1587,7 @@ const LayerItem: React.FC<{
 
     // Handle icon layers (check layer.name, not htmlTag since settings.tag might be 'div')
     if (layer.name === 'icon') {
-      const iconSrc = layer.variables?.icon?.src;
+      const iconSrc = effectiveLayer.variables?.icon?.src;
       let iconHtml = '';
 
       if (iconSrc) {
@@ -1575,8 +1661,8 @@ const LayerItem: React.FC<{
 
     if (htmlTag === 'video' || htmlTag === 'audio') {
       // Check if this is a YouTube video (VideoVariable type)
-      if (htmlTag === 'video' && layer.variables?.video?.src) {
-        const videoSrc = layer.variables.video.src;
+      if (htmlTag === 'video' && effectiveLayer.variables?.video?.src) {
+        const videoSrc = effectiveLayer.variables.video.src;
 
         // YouTube video - render as iframe
         if (videoSrc.type === 'video' && 'provider' in videoSrc.data && videoSrc.data.provider === 'youtube') {
@@ -1651,8 +1737,8 @@ const LayerItem: React.FC<{
 
       // Regular video/audio - render as media element
       const mediaSrc = (() => {
-        if (htmlTag === 'video' && layer.variables?.video?.src) {
-          const src = layer.variables.video.src;
+        if (htmlTag === 'video' && effectiveLayer.variables?.video?.src) {
+          const src = effectiveLayer.variables.video.src;
           // Skip VideoVariable type (already handled above as YouTube iframe)
           if (src.type === 'video') {
             return undefined;
@@ -1674,8 +1760,6 @@ const LayerItem: React.FC<{
             }
           }
 
-          // getVideoUrlFromVariable handles AssetVariable, FieldVariable, and DynamicTextVariable
-          // For FieldVariable, it resolves the field value (asset ID) and looks up the asset URL
           return getVideoUrlFromVariable(
             videoVariable,
             getAsset,
@@ -1683,8 +1767,8 @@ const LayerItem: React.FC<{
             pageCollectionItemData
           );
         }
-        if (htmlTag === 'audio' && layer.variables?.audio?.src) {
-          const src = layer.variables.audio.src;
+        if (htmlTag === 'audio' && effectiveLayer.variables?.audio?.src) {
+          const src = effectiveLayer.variables.audio.src;
 
           // Apply translation for audio asset
           let audioVariable = src;
@@ -1702,8 +1786,6 @@ const LayerItem: React.FC<{
             }
           }
 
-          // getVideoUrlFromVariable handles AssetVariable, FieldVariable, and DynamicTextVariable
-          // For FieldVariable, it resolves the field value (asset ID) and looks up the asset URL
           return getVideoUrlFromVariable(
             audioVariable,
             getAsset,
@@ -1716,9 +1798,9 @@ const LayerItem: React.FC<{
 
       // Get poster URL for video elements
       const posterUrl = (() => {
-        if (htmlTag === 'video' && layer.variables?.video?.poster) {
+        if (htmlTag === 'video' && effectiveLayer.variables?.video?.poster) {
           // Apply translation for video poster
-          let posterVariable = layer.variables.video.poster;
+          let posterVariable = effectiveLayer.variables.video.poster;
           if (posterVariable?.type === 'asset' && posterVariable.data?.asset_id) {
             const originalAssetId = posterVariable.data.asset_id;
             const translatedAssetId = getTranslatedAssetId(

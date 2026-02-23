@@ -301,7 +301,7 @@ export async function fetchPageByPath(
     }
 
     // Fetch all components once at the start
-    const components = await fetchComponents(supabase);
+    const components = await fetchComponents(supabase, isPublished);
 
     const targetPath = pathWithoutLocale;
 
@@ -594,7 +594,7 @@ export async function fetchErrorPage(
       return null;
     }
 
-    const components = await fetchComponents(supabase);
+    const components = await fetchComponents(supabase, isPublished);
 
     // First, resolve components so collection layers inside components are available
     const layersWithComponents = resolveComponents(pageLayers?.layers || [], components);
@@ -684,7 +684,7 @@ export async function fetchHomepage(
     }
 
     // Use preloaded components if available, otherwise fetch them
-    const components = preloadedComponents || await fetchComponents(supabase);
+    const components = preloadedComponents || await fetchComponents(supabase, isPublished);
 
     // First, resolve components so collection layers inside components are available
     const layersWithComponents = resolveComponents(pageLayers?.layers || [], components);
@@ -841,12 +841,15 @@ function injectTranslatedText(
 /**
  * Fetch all components from the database
  * @param supabase - Supabase client
+ * @param isPublished - Whether to fetch published or draft components (defaults to false for draft)
  * @returns Array of components or empty array if fetch fails
  */
-async function fetchComponents(supabase: any): Promise<Component[]> {
+async function fetchComponents(supabase: any, isPublished: boolean = false): Promise<Component[]> {
   const { data: components } = await supabase
     .from('components')
-    .select('*');
+    .select('*')
+    .eq('is_published', isPublished)
+    .is('deleted_at', null);
   return components || [];
 }
 

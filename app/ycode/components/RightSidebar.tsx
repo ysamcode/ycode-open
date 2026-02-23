@@ -31,9 +31,9 @@ import EffectControls from './EffectControls';
 import CollectionFiltersSettings from './CollectionFiltersSettings';
 import ConditionalVisibilitySettings from './ConditionalVisibilitySettings';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
-import VideoSettings from './VideoSettings';
-import AudioSettings from './AudioSettings';
-import IconSettings from './IconSettings';
+import VideoSettings, { type VideoSettingsValue } from './VideoSettings';
+import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
+import IconSettings, { type IconSettingsValue } from './IconSettings';
 import FormSettings from './FormSettings';
 import AlertSettings from './AlertSettings';
 import HTMLEmbedSettings from './HTMLEmbedSettings';
@@ -159,6 +159,12 @@ const RightSidebar = React.memo(function RightSidebar({
   const [localeLabelOpen, setLocaleLabelOpen] = useState(true);
   const [variablesOpen, setVariablesOpen] = useState(true);
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
+  const [variablesDialogInitialId, setVariablesDialogInitialId] = useState<string | null>(null);
+
+  const openVariablesDialog = (variableId?: string) => {
+    setVariablesDialogInitialId(variableId ?? null);
+    setVariablesDialogOpen(true);
+  };
   const [interactionOwnerLayerId, setInteractionOwnerLayerId] = useState<string | null>(null);
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [interactionResetKey, setInteractionResetKey] = useState(0);
@@ -1672,12 +1678,18 @@ const RightSidebar = React.memo(function RightSidebar({
     };
 
     const allVariables = component.variables || [];
-    const textVariables = allVariables.filter(v => v.type !== 'image' && v.type !== 'link');
+    const textVariables = allVariables.filter(v => !v.type || v.type === 'text');
     const imageVariables = allVariables.filter(v => v.type === 'image');
     const linkVariables = allVariables.filter(v => v.type === 'link');
+    const audioVariables = allVariables.filter(v => v.type === 'audio');
+    const videoVariables = allVariables.filter(v => v.type === 'video');
+    const iconVariables = allVariables.filter(v => v.type === 'icon');
     const currentTextOverrides = selectedLayer.componentOverrides?.text || {};
     const currentImageOverrides = selectedLayer.componentOverrides?.image || {};
     const currentLinkOverrides = selectedLayer.componentOverrides?.link || {};
+    const currentAudioOverrides = selectedLayer.componentOverrides?.audio || {};
+    const currentVideoOverrides = selectedLayer.componentOverrides?.video || {};
+    const currentIconOverrides = selectedLayer.componentOverrides?.icon || {};
 
     // Extract Tiptap content from text ComponentVariableValue
     // Falls back to variable's default_value if no override is set
@@ -1751,6 +1763,63 @@ const RightSidebar = React.memo(function RightSidebar({
       });
     };
 
+    // Get audio override value
+    const getAudioOverrideValue = (variableId: string) => {
+      const overrideValue = currentAudioOverrides[variableId];
+      const variableDef = audioVariables.find(v => v.id === variableId);
+      return (overrideValue ?? variableDef?.default_value) as AudioSettingsValue | undefined;
+    };
+
+    const handleAudioVariableOverrideChange = (variableId: string, value: AudioSettingsValue) => {
+      onLayerUpdate(selectedLayerId!, {
+        componentOverrides: {
+          ...selectedLayer.componentOverrides,
+          audio: {
+            ...currentAudioOverrides,
+            [variableId]: value,
+          },
+        },
+      });
+    };
+
+    // Get video override value
+    const getVideoOverrideValue = (variableId: string) => {
+      const overrideValue = currentVideoOverrides[variableId];
+      const variableDef = videoVariables.find(v => v.id === variableId);
+      return (overrideValue ?? variableDef?.default_value) as VideoSettingsValue | undefined;
+    };
+
+    const handleVideoVariableOverrideChange = (variableId: string, value: VideoSettingsValue) => {
+      onLayerUpdate(selectedLayerId!, {
+        componentOverrides: {
+          ...selectedLayer.componentOverrides,
+          video: {
+            ...currentVideoOverrides,
+            [variableId]: value,
+          },
+        },
+      });
+    };
+
+    // Get icon override value
+    const getIconOverrideValue = (variableId: string) => {
+      const overrideValue = currentIconOverrides[variableId];
+      const variableDef = iconVariables.find(v => v.id === variableId);
+      return (overrideValue ?? variableDef?.default_value) as IconSettingsValue | undefined;
+    };
+
+    const handleIconVariableOverrideChange = (variableId: string, value: IconSettingsValue) => {
+      onLayerUpdate(selectedLayerId!, {
+        componentOverrides: {
+          ...selectedLayer.componentOverrides,
+          icon: {
+            ...currentIconOverrides,
+            [variableId]: value,
+          },
+        },
+      });
+    };
+
     // Handle detaching from component (converts instance to regular layers)
     const handleDetachFromComponent = () => {
       if (!selectedLayer.componentId) return;
@@ -1774,13 +1843,15 @@ const RightSidebar = React.memo(function RightSidebar({
     const handleResetAllOverrides = () => {
       if (!selectedLayerId) return;
 
-      // Clear all text, image, and link overrides - values will fall back to defaults
       onLayerUpdate(selectedLayerId, {
         componentOverrides: {
           ...selectedLayer.componentOverrides,
           text: {},
           image: {},
           link: {},
+          audio: {},
+          video: {},
+          icon: {},
         },
       });
     };
@@ -1798,8 +1869,7 @@ const RightSidebar = React.memo(function RightSidebar({
 
           <hr className="mt-4" />
 
-          <div className="flex flex-col divide-y divide-border">
-
+          <div className="flex flex-col divide-y divide-border overflow-y-auto no-scrollbar">
             <SettingsPanel
               title="Component instance"
               isOpen={true}
@@ -1815,7 +1885,7 @@ const RightSidebar = React.memo(function RightSidebar({
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={handleResetAllOverrides}
-                        disabled={Object.keys(currentTextOverrides).length === 0 && Object.keys(currentImageOverrides).length === 0 && Object.keys(currentLinkOverrides).length === 0}
+                        disabled={Object.keys(currentTextOverrides).length === 0 && Object.keys(currentImageOverrides).length === 0 && Object.keys(currentLinkOverrides).length === 0 && Object.keys(currentAudioOverrides).length === 0 && Object.keys(currentVideoOverrides).length === 0 && Object.keys(currentIconOverrides).length === 0}
                       >
                         <Icon name="undo" />
                         Reset all overrides
@@ -1834,7 +1904,7 @@ const RightSidebar = React.memo(function RightSidebar({
                   <Icon name="component" className="size-3" />
                 </div>
                 <span>{component.name}</span>
-                {(Object.keys(currentTextOverrides).length > 0 || Object.keys(currentImageOverrides).length > 0 || Object.keys(currentLinkOverrides).length > 0) && (
+                {(Object.keys(currentTextOverrides).length > 0 || Object.keys(currentImageOverrides).length > 0 || Object.keys(currentLinkOverrides).length > 0 || Object.keys(currentAudioOverrides).length > 0 || Object.keys(currentVideoOverrides).length > 0 || Object.keys(currentIconOverrides).length > 0) && (
                     <span className="ml-auto text-[10px] italic text-orange-600 dark:text-orange-200">Overridden</span>
                 )}
               </div>
@@ -1854,77 +1924,145 @@ const RightSidebar = React.memo(function RightSidebar({
               isOpen={variablesOpen}
               onToggle={() => setVariablesOpen(!variablesOpen)}
             >
-              {/* Text variable overrides */}
-              {textVariables.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {textVariables.map((variable) => (
-                    <div key={variable.id} className="grid grid-cols-3 gap-2">
-                      <Label variant="muted" className="truncate">
-                        {variable.name}
-                      </Label>
-                      <div className="col-span-2 *:w-full">
-                        <RichTextEditor
-                          value={getOverrideValue(variable.id)}
-                          onChange={(val) => handleVariableOverrideChange(variable.id, val)}
-                          placeholder="Enter value..."
-                          fieldGroups={fieldGroups}
-                          allFields={fields}
-                          collections={collections}
-                          withFormatting={true}
-                          showFormattingToolbar={false}
-                        />
+              <div className="flex flex-col gap-6">
+                {/* Text variable overrides */}
+                {textVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {textVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2">
+                        <Label variant="muted" className="truncate">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2 *:w-full">
+                          <RichTextEditor
+                            value={getOverrideValue(variable.id)}
+                            onChange={(val) => handleVariableOverrideChange(variable.id, val)}
+                            placeholder="Enter value..."
+                            fieldGroups={fieldGroups}
+                            allFields={fields}
+                            collections={collections}
+                            withFormatting={true}
+                            showFormattingToolbar={false}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
 
-              {/* Image variable overrides */}
-              {imageVariables.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {imageVariables.map((variable) => (
-                    <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-                      <Label variant="muted" className="truncate pt-2">
-                        {variable.name}
-                      </Label>
-                      <div className="col-span-2">
-                        <ImageSettings
-                          mode="standalone"
-                          value={getImageOverrideValue(variable.id)}
-                          onChange={(val) => handleImageVariableOverrideChange(variable.id, val)}
-                          fieldGroups={fieldGroups}
-                          allFields={fields}
-                          collections={collections}
-                        />
+                {/* Image variable overrides */}
+                {imageVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {imageVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+                        <Label variant="muted" className="truncate pt-2">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2">
+                          <ImageSettings
+                            mode="standalone"
+                            value={getImageOverrideValue(variable.id)}
+                            onChange={(val) => handleImageVariableOverrideChange(variable.id, val)}
+                            fieldGroups={fieldGroups}
+                            allFields={fields}
+                            collections={collections}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
 
-              {/* Link variable overrides */}
-              {linkVariables.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {linkVariables.map((variable) => (
-                    <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-                      <Label variant="muted" className="truncate pt-2">
-                        {variable.name}
-                      </Label>
-                      <div className="col-span-2">
-                        <LinkSettings
-                          mode="standalone"
-                          value={getLinkOverrideValue(variable.id)}
-                          onChange={(val) => handleLinkVariableOverrideChange(variable.id, val)}
-                          fieldGroups={fieldGroups}
-                          allFields={fields}
-                          collections={collections}
-                          isInsideCollectionLayer={!!parentCollectionLayer}
-                        />
+                {/* Link variable overrides */}
+                {linkVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {linkVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+                        <Label variant="muted" className="truncate pt-2">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2">
+                          <LinkSettings
+                            mode="standalone"
+                            value={getLinkOverrideValue(variable.id)}
+                            onChange={(val) => handleLinkVariableOverrideChange(variable.id, val)}
+                            fieldGroups={fieldGroups}
+                            allFields={fields}
+                            collections={collections}
+                            isInsideCollectionLayer={!!parentCollectionLayer}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+
+                {/* Audio variable overrides */}
+                {audioVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {audioVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+                        <Label variant="muted" className="truncate pt-2">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2">
+                          <AudioSettings
+                            mode="standalone"
+                            value={getAudioOverrideValue(variable.id)}
+                            onChange={(val) => handleAudioVariableOverrideChange(variable.id, val)}
+                            fieldGroups={fieldGroups}
+                            allFields={fields}
+                            collections={collections}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Video variable overrides */}
+                {videoVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {videoVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+                        <Label variant="muted" className="truncate pt-2">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2">
+                          <VideoSettings
+                            mode="standalone"
+                            value={getVideoOverrideValue(variable.id)}
+                            onChange={(val) => handleVideoVariableOverrideChange(variable.id, val)}
+                            fieldGroups={fieldGroups}
+                            allFields={fields}
+                            collections={collections}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Icon variable overrides */}
+                {iconVariables.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {iconVariables.map((variable) => (
+                      <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+                        <Label variant="muted" className="truncate pt-2">
+                          {variable.name}
+                        </Label>
+                        <div className="col-span-2">
+                          <IconSettings
+                            mode="standalone"
+                            value={getIconOverrideValue(variable.id)}
+                            onChange={(val) => handleIconVariableOverrideChange(variable.id, val)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {allVariables.length === 0 && (
                 <div className="flex-1 flex items-center justify-center">
@@ -2302,7 +2440,7 @@ const RightSidebar = React.memo(function RightSidebar({
                                   </DropdownMenuPortal>
                                 </DropdownMenuSub>
                               )}
-                              <DropdownMenuItem onClick={() => setVariablesDialogOpen(true)}>
+                              <DropdownMenuItem onClick={() => openVariablesDialog()}>
                                 Manage variables
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -2319,13 +2457,14 @@ const RightSidebar = React.memo(function RightSidebar({
                           asChild
                           variant="purple"
                           className="justify-between!"
-                          onClick={handleUnlinkVariable}
+                          onClick={() => openVariablesDialog(linkedVariable.id)}
                         >
                           <div>
                             <span>{linkedVariable.name}</span>
                             <Button
                               className="size-4! p-0!"
                               variant="outline"
+                              onClick={(e) => { e.stopPropagation(); handleUnlinkVariable(); }}
                             >
                               <Icon name="x" className="size-2" />
                             </Button>
@@ -2366,7 +2505,7 @@ const RightSidebar = React.memo(function RightSidebar({
                 collections={collections}
                 isLockedByOther={isLockedByOther}
                 isInsideCollectionLayer={!!parentCollectionLayer}
-                onOpenVariablesDialog={() => setVariablesDialogOpen(true)}
+                onOpenVariablesDialog={openVariablesDialog}
               />
             )}
 
@@ -2749,7 +2888,7 @@ const RightSidebar = React.memo(function RightSidebar({
               fieldGroups={fieldGroups}
               allFields={fields}
               collections={collections}
-              onOpenVariablesDialog={() => setVariablesDialogOpen(true)}
+              onOpenVariablesDialog={openVariablesDialog}
             />
 
             <VideoSettings
@@ -2758,6 +2897,7 @@ const RightSidebar = React.memo(function RightSidebar({
               fieldGroups={fieldGroups}
               allFields={fields}
               collections={collections}
+              onOpenVariablesDialog={openVariablesDialog}
             />
 
             <AudioSettings
@@ -2766,11 +2906,13 @@ const RightSidebar = React.memo(function RightSidebar({
               fieldGroups={fieldGroups}
               allFields={fields}
               collections={collections}
+              onOpenVariablesDialog={openVariablesDialog}
             />
 
             <IconSettings
               layer={selectedLayer}
               onLayerUpdate={handleLayerUpdate}
+              onOpenVariablesDialog={openVariablesDialog}
             />
 
             <HTMLEmbedSettings
@@ -2937,8 +3079,12 @@ const RightSidebar = React.memo(function RightSidebar({
       {/* Component Variables Dialog */}
       <ComponentVariablesDialog
         open={variablesDialogOpen}
-        onOpenChange={setVariablesDialogOpen}
+        onOpenChange={(open) => {
+          setVariablesDialogOpen(open);
+          if (!open) setVariablesDialogInitialId(null);
+        }}
         componentId={editingComponentId}
+        initialVariableId={variablesDialogInitialId}
       />
     </div>
   );
