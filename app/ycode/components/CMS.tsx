@@ -1494,8 +1494,8 @@ const CMS = React.memo(function CMS() {
           items={sortedItems.map(item => item.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="flex flex-col flex-1">
-            <table className="flex-1 border-0 whitespace-nowrap text-xs min-w-full align-top border-separate border-spacing-0 [&>tbody>tr>td]:border-b [&>tbody>tr>td]:max-w-56">
+          <div className={cn('flex flex-col', sortedItems.length === 0 && 'flex-1')}>
+            <table className={cn('border-0 whitespace-nowrap text-xs min-w-full align-top border-separate border-spacing-0 [&>tbody>tr>td]:border-b [&>tbody>tr>td]:max-w-56', sortedItems.length === 0 && 'flex-1')}>
               <thead className="">
                 <tr className="">
                   <th className="pl-5 pr-3 py-5 text-left font-normal w-12 sticky top-0 z-10 bg-background border-b border-border">
